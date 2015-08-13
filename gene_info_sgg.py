@@ -271,33 +271,55 @@ class ExonSet():
 class TranscriptSiteInfo():
     """Populated by append_category_beds."""
 
-    def __init__(self, hugo, refseq, chrom):
+    def __init__(self, hugo=None, refseq=None, chrom=None,
+                 silent_ts=None, nonsilent_ts=None,
+                 silent_tv=None, nonsilent_tv=None):
         self.hugo = hugo
         self.refseq = refseq
         self.chrom = chrom
         self.site_list = list()
+        self.path_dict = {
+            ('transition', True): silent_ts,
+            ('transition', False): nonsilent_ts,
+            ('transversion', True): silent_tv,
+            ('transversion', False): nonsilent_tv
+            }
 
     # def add_site(self, pos, is_at, is_cg, is_cpg, has_silent, has_nonsilent):
     # """Add site category info to collection that will include whole transcript."""
     # self.site_list.append((pos, is_at, is_cg, is_cpg, has_silent, has_nonsilent))
-    def add_site(self, pos, has_silent, has_nonsilent):
+    def add_site(self, pos, kind=None, is_silent=True):
         """Add site category info to collection that will include whole
         transcript."""
-        self.site_list.append((pos, has_silent, has_nonsilent))
+        self.site_list.append((pos, kind, is_silent))
 
     # def write_category_bed(self, file_obj, is_at, is_cg, is_cpg, has_silent, has_nonsilent):
-    def write_category_bed(self, file_obj, write_silent, write_nonsilent):
-        """Write to file sites that match desired category booleans."""
-        for site in self.site_list:
-            # if (site[1] is is_at and site[2] is is_cg and site[3] is is_cpg and
-            #             site[4] is has_silent and site[5] is has_nonsilent):
-            if (write_silent and site[1]) or (write_nonsilent and site[2]):
-                pos_str = "{}\t{}\t{}\t{}\n".format(self.chrom, site[0] - 1,
-                                                    site[0], self.hugo)
+    def write_category_beds(self):
+        """Write sites to file.
+        file_dict = {
+        ('transition', True): 'path_a',
+        ('transition', False): 'path_b',
+        ('transversion', True): 'path_c',
+        ('transversion', False): 'path_d',
+        }
+        """
+        streams = dict()  # 4 output streams
+        try:
+            for pair in self.path_dict:
+                streams[pair] = open(self.path_dict[pair], 'a')
+
+            for site in self.site_list:
+                file_obj = streams[site[1:]]
+                pos_str = "{}\t{}\t{}\t{}\n".\
+                    format(self.chrom, site[0] - 1, site[0], self.hugo)
                 file_obj.write(pos_str)
+        finally:
+            for stream in streams.values():
+                stream.close()
 
+def append_category_beds(refseq_NM, silent_ts=None, silent_tv=None,
+                         nonsilent_ts=None, nonsilent_tv=None):
 
-def append_category_beds(refseq_NM, silent_path, nonsilent_path):
     try:
         g = GeneSeq(refseq_NM)
     except LookupFailedException as e:
@@ -305,12 +327,15 @@ def append_category_beds(refseq_NM, silent_path, nonsilent_path):
         return
     # print(g.cds_seq)
     alt_dict = dict(A='CGT', C='AGT', G='ACT', T='ACG')
-    site_info = TranscriptSiteInfo(g.hugo, refseq_NM, g.exonSet.chrom)
-    # bool_dict = {True:'1', False:'0'}
-    # with open(g.hugo + "_silent.bed",'w') as out_silent:
-    # with open(g.hugo + "_nonsilent.bed",'w') as out_nonsilent:
-    # out_silent.write('chr\tstart\tend\n')
-    # out_nonsilent.write('chr\tstart\tend\n')
+    transition_dict = {'A':'G', 'C':'T', 'G':'A', 'T':'C'}
+    site_info = TranscriptSiteInfo(hugo=g.hugo,
+                                   refseq=refseq_NM,
+                                   chrom=g.exonSet.chrom,
+                                   silent_ts=silent_ts,
+                                   nonsilent_ts=nonsilent_ts,
+                                   silent_tv=silent_tv,
+                                   nonsilent_tv=nonsilent_tv)
+
     for codon_ind in xrange(g.n_codons):
         # identify previous and next base (prv_base, nxt_base)
         bases3 = g.cds_seq[codon_ind * 3:codon_ind * 3 + 3]
@@ -331,21 +356,20 @@ def append_category_beds(refseq_NM, silent_path, nonsilent_path):
             #     assert isinstance(is_cpg, bool)
             #     is_cg = not is_cpg
             # for each alternative base
-            for alt in alt_dict[bases3[subind]]:
+            this_base = bases3[subind]
+            for alt in alt_dict[this_base]:  # 3 alternative bases
+                if transition_dict[this_base].upper() == alt:
+                    kind = 'transition'
+                else:
+                    kind = 'transversion'
                 newbases = bases3.tomutable()
                 newbases[subind] = alt
                 new_aa = newbases.toseq().translate()
                 if new_aa[0] == aa_orig:
-                    has_silent = True
+                    site_info.add_site(hg_pos, kind=kind, is_silent=True)
                 else:
-                    has_nonsilent = True
-                    # if has_nonsilent and has_silent:
-                    # 	break  # out of alternative iteration
-            site_info.add_site(hg_pos, has_silent, has_nonsilent)
-    with open(silent_path, 'a') as out:
-        site_info.write_category_bed(out, True, False)
-    with open(nonsilent_path, 'a') as out:
-        site_info.write_category_bed(out, False, True)
+                    site_info.add_site(hg_pos, kind=kind, is_silent=False)
+    site_info.write_category_beds()
         # condense_beds_2cat(g.hugo)
 
 
@@ -365,35 +389,45 @@ def condense_beds_2cat(hugo):
         os.remove(sorted_path)
 
 
-def condense_beds_silent_nonsilent(silent_path, nonsilent_path):
+def condense_bed(raw_path):
     """Sort and merge both silent and nonsilent raw bed files for gene."""
-    for raw_path in [silent_path, nonsilent_path]:
-        sorted_path = raw_path + "_sorted.bed"
-        condense_path = raw_path + "_final.bed"
+    sorted_path = raw_path + "_sorted.bed"
+    condense_path = raw_path + "_final.bed"
 
-        cmd1 = ["sort", "-k1,1", "-k2,2n", raw_path, "-o", sorted_path]
-        cmd2 = [os.path.join(bed_bin_dir,"mergeBed"), "-i", sorted_path, "-c", "4", "-o", "distinct"]
-        subprocess.check_call(cmd1)
-        # with open(condense_path, 'w') as file:
-        #     subprocess.check_call(cmd2, stdout=file)
-        with open(os.devnull, "r") as fnullin:
-            with open(condense_path, "w") as outfile:
-                p = subprocess.Popen(cmd2, stdin=fnullin, stdout=outfile)
-                p.wait()
-        os.remove(raw_path)
-        os.remove(sorted_path)
+    cmd1 = ["sort", "-k1,1", "-k2,2n", raw_path, "-o", sorted_path]
+    cmd2 = [os.path.join(bed_bin_dir,"mergeBed"), "-i", sorted_path,
+            "-c", "4", "-o", "distinct"]
+    subprocess.check_call(cmd1)
+    # with open(condense_path, 'w') as file:
+    #     subprocess.check_call(cmd2, stdout=file)
+    with open(os.devnull, "r") as fnullin:
+        with open(condense_path, "w") as outfile:
+            p = subprocess.Popen(cmd2, stdin=fnullin, stdout=outfile)
+            p.wait()
+    os.remove(raw_path)
+    os.remove(sorted_path)
 
 
-def get_beds_for_refseq_list(refseq_list, silent_path, nonsilent_path):
+def get_beds_for_refseq_list(refseq_list,
+                             silent_ts="/Users/Stephen/Downloads/roi_s_ts",
+                             silent_tv="/Users/Stephen/Downloads/roi_s_tv",
+                             nonsilent_ts="/Users/Stephen/Downloads/roi_ns_ts",
+                             nonsilent_tv="/Users/Stephen/Downloads/roi_ns_tv"):
     """Takes list of refseq_NM strings and creates silent and nonsilent bed
     files."""
-    for path in [silent_path, nonsilent_path]:
+    path_list = [silent_ts, nonsilent_ts, silent_tv, nonsilent_tv]
+    for path in path_list:
         if os.path.exists(path):
             os.remove(path)
 
     for refseq in refseq_list:
-        append_category_beds(refseq, silent_path, nonsilent_path)
-    condense_beds_silent_nonsilent(silent_path, nonsilent_path)
+        append_category_beds(refseq,
+                             silent_ts=silent_ts,
+                             nonsilent_ts=nonsilent_ts,
+                             silent_tv=silent_tv,
+                             nonsilent_tv=nonsilent_tv)
+    for path in path_list:
+        condense_bed(path)
 
 
 if __name__ == '__main__':
