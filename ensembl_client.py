@@ -6,6 +6,12 @@ import urllib2
 import json
 import time
 
+# class RequestFailedException(Exception):
+#     pass
+
+class LookupFailedException(Exception):
+    pass
+
 class EnsemblRestClient(object):
     def __init__(self, server='http://rest.ensembl.org', reqs_per_sec=15):
         self.server = server
@@ -49,6 +55,7 @@ class EnsemblRestClient(object):
                     time.sleep(float(retry))
                     self.perform_rest_action(endpoint, hdrs, params)
             else:
-                sys.stderr.write('Request failed for {0}: Status code: {1.code} Reason: {1.reason}\n'.format(endpoint, e))
+                raise LookupFailedException(
+                    'Request failed for {0}: Status code: {1.code} Reason: {1.reason}\n'.format(endpoint, e))
 
         return data

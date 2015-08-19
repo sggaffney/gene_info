@@ -6,7 +6,7 @@ from Bio.Alphabet import IUPAC
 import subprocess
 import os
 import numpy as np
-from ensembl_client import EnsemblRestClient
+from ensembl_client import EnsemblRestClient, LookupFailedException
 
 dbvars = {'host': 'localhost', 'db': 'CancerDB',
           'read_default_file': "~/.my.cnf"}
@@ -18,10 +18,6 @@ class NoIntervalsException(Exception):
     pass
 
 
-class LookupFailedException(Exception):
-    pass
-
-
 class LengthMismatchException(Exception):
     pass
 
@@ -30,11 +26,16 @@ class CanonicalInfo:
     """Builds on ensembl api transcript info object."""
     def __init__(self, hugo_symbol):
         self.hugo_symbol = hugo_symbol
-        transcript_gene = self.fetch_transcript_for_hugo(hugo_symbol)
+        transcript_gene = self.fetch_ids_for_hugo(hugo_symbol)
         self.transcript_id, self.gene_id = transcript_gene
+        try:
+            info = self.fetch_transcript(self.transcript_id)
+        except LookupFailedException:
+            vals = self.fetch_gene_from_symbol(hugo_symbol)
+            self.gene_id, self.transcript_id, info = vals
         self.cds_seq = self.get_cds_seq(self.transcript_id)
         self.aa_seq = self.cds_seq.translate()
-        info = self.get_exons(self.transcript_id)
+
         self.chrom = info['seq_region_name']
         self.strand = info['strand']
         self.n_exons = len(info['Exon'])
@@ -44,17 +45,8 @@ class CanonicalInfo:
 
         u5 = [i for i in info['UTR'] if i['object_type'] == 'five_prime_UTR']
         u3 = [i for i in info['UTR'] if i['object_type'] == 'three_prime_UTR']
-        u5_starts = [i['start'] for i in u5]
-        u5_ends = [i['end'] for i in u5]
-        u3_starts = [i['start'] for i in u3]
-        u3_ends = [i['end'] for i in u3]
 
-        if self.strand == -1:
-            u3_cutoff = max(u3_starts[:] + u3_ends[:])
-            u5_cutoff = min(u5_starts[:] + u5_ends[:])
-        else:
-            u3_cutoff = min(u3_starts[:] + u3_ends[:])
-            u5_cutoff = max(u5_starts[:] + u5_ends[:])
+        u5_cutoff, u3_cutoff = self._get_utr_cutoffs(u5, u3)
 
         cds_intervals = self._get_cds_intervals(self.strand, exon_starts,
                                                 exon_ends, u5_cutoff, u3_cutoff)
@@ -72,8 +64,26 @@ class CanonicalInfo:
             classname=self.__class__.__name__, hugo=self.hugo_symbol,
             n_aa=self.n_codons - 1, cdslen=self.cds_len)
 
+    def _get_utr_cutoffs(self, u5, u3):
+        u5_cutoff, u3_cutoff = None, None
+        u5_starts = [i['start'] for i in u5]
+        u5_ends = [i['end'] for i in u5]
+        u3_starts = [i['start'] for i in u3]
+        u3_ends = [i['end'] for i in u3]
+        if self.strand == -1:
+            if u5:
+                u5_cutoff = min(u5_starts)
+            if u3:
+                u3_cutoff = max(u3_ends)
+        else:  # + strand
+            if u5:
+                u5_cutoff = max(u5_ends)
+            if u3:
+                u3_cutoff = min(u3_starts)
+        return u5_cutoff, u3_cutoff
+
     @staticmethod
-    def get_exons(transcript_id, server='http://grch37.rest.ensembl.org'):
+    def fetch_transcript(transcript_id, server='http://grch37.rest.ensembl.org'):
         """Lookup transcript, exon and UTR info from Ensembl Rest API."""
         client = EnsemblRestClient(server)
         transcript_info = client.perform_rest_action(
@@ -83,17 +93,42 @@ class CanonicalInfo:
         return transcript_info
 
     @staticmethod
+    def fetch_gene_from_symbol(symbol, server='http://grch37.rest.ensembl.org'):
+        """Lookup transcript, exon and UTR info from Ensembl Rest API."""
+        client = EnsemblRestClient(server)
+
+        symbol_lookup = client.perform_rest_action(
+            '/xrefs/symbol/human/{0}'.format(symbol),
+            params={'external_db': 'HGNC', 'object_type':'gene'})
+        gene_id = symbol_lookup[0]['id']
+
+        gene = client.perform_rest_action(
+            '/lookup/id/{0}'.format(gene_id),
+            params={'expand': '1', 'utr': 1})
+
+        transcripts = [i for i in gene['Transcript'] if i['is_canonical'] == 1]
+        if len(transcripts) != 1:
+            raise LookupFailedException("Lookup for symbol {} failed".format(
+                symbol))
+        transcript_info = transcripts[0]
+        transcript_id = transcript_info['id']
+        return gene_id, transcript_id, transcript_info
+
+    @staticmethod
     def get_cds_seq(transcript_id, server='http://grch37.rest.ensembl.org'):
         """Lookup transcript, exon and UTR info from Ensembl Rest API."""
         client = EnsemblRestClient(server)
         seq_info = client.perform_rest_action(
             '/sequence/id/{0}'.format(transcript_id),
             params={'type': 'cds'})
-        seq = Seq(seq_info['seq'], IUPAC.unambiguous_dna)
+        seq_str = seq_info['seq']
+        if seq_str.startswith('N') or seq_str.endswith('N'):
+            seq_str = seq_str.strip('N')
+        seq = Seq(seq_str, IUPAC.unambiguous_dna)
         return seq
 
     @staticmethod
-    def fetch_transcript_for_hugo(hugo_symbol):
+    def fetch_ids_for_hugo(hugo_symbol):
         """Get canonical transcript id and gene_id from ensembl."""
         con, rows, transcript_id, gene_id = None, None, None, None
         cmd1 = "SELECT `canonical_transcript`, `ensembl_gene_id` FROM " \
@@ -136,27 +171,33 @@ class CanonicalInfo:
             low_cutoff = u5_cutoff
             high_cutoff = u3_cutoff
         # remove low_cutoff section
-        keep_intervals1 = []
-        for interval in exon_intervals:
-            if interval[0] > low_cutoff:
-                keep_intervals1.append(interval)
-                continue
-            if interval[1] < low_cutoff:
-                continue
-            # now start <= cutoff <= end
-            if low_cutoff+1 <= interval[1]:
-                keep_intervals1.append((low_cutoff+1, interval[1]))
-        keep_intervals2 = []
-        # remove high_cutoff section
-        for interval in keep_intervals1:
-            if interval[1] < high_cutoff:
-                keep_intervals2.append(interval)
-                continue
-            if interval[0] > high_cutoff:
-                continue
-            # now start <= cutoff <= end
-            if high_cutoff-1 >= interval[0]:
-                keep_intervals2.append((interval[0], high_cutoff-1))
+        if low_cutoff is None:
+            keep_intervals1 = exon_intervals[:]
+        else:
+            keep_intervals1 = []
+            for interval in exon_intervals:
+                if interval[0] > low_cutoff:
+                    keep_intervals1.append(interval)
+                    continue
+                if interval[1] < low_cutoff:
+                    continue
+                # now start <= cutoff <= end
+                if low_cutoff+1 <= interval[1]:
+                    keep_intervals1.append((low_cutoff+1, interval[1]))
+        if high_cutoff is None:
+            keep_intervals2 = keep_intervals1
+        else:
+            keep_intervals2 = []
+            # remove high_cutoff section
+            for interval in keep_intervals1:
+                if interval[1] < high_cutoff:
+                    keep_intervals2.append(interval)
+                    continue
+                if interval[0] > high_cutoff:
+                    continue
+                # now start <= cutoff <= end
+                if high_cutoff-1 >= interval[0]:
+                    keep_intervals2.append((interval[0], high_cutoff-1))
         if strand == -1:
             keep_intervals2.reverse()
         return keep_intervals2
