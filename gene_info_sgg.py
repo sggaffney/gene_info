@@ -22,17 +22,32 @@ class LengthMismatchException(Exception):
     pass
 
 
-class CanonicalInfo:
+class CanonicalInfo(object):
     """Builds on ensembl api transcript info object."""
-    def __init__(self, hugo_symbol):
+    def __init__(self, hugo_symbol, server='http://grch37.rest.ensembl.org'):
+        self.client = EnsemblRestClient(server=server)
         self.hugo_symbol = hugo_symbol
-        transcript_gene = self.fetch_ids_for_hugo(hugo_symbol)
-        self.transcript_id, self.gene_id = transcript_gene
         try:
-            info = self.fetch_transcript(self.transcript_id)
+            # fetch_ids_for_hugo OR fetch_transcript could fail
+            transcript_gene = self.fetch_ids_for_hugo(hugo_symbol)
+            self.transcript_id, self.gene_id = transcript_gene
+            if self.transcript_id is not None:
+                # REST LOOKUP from transcript id
+                info = self.fetch_transcript(self.transcript_id)
+            if self.transcript_id is None:
+                if self.gene_id is not None:
+                    # REST LOOKUP from gene id
+                    vals = self.fetch_transcript_info_from_gene_id(self.gene_id)
+                    self.transcript_id, info = vals
+                else:
+                    raise LookupFailedException("No match for {}".
+                                                format(self.gene_id))
         except LookupFailedException:
-            vals = self.fetch_gene_from_symbol(hugo_symbol)
-            self.gene_id, self.transcript_id, info = vals
+            # REST LOOKUP from symbol
+            self.gene_id = self.fetch_gene_id_from_symbol(hugo_symbol)
+            # REST LOOKUP from gene id
+            vals = self.fetch_transcript_info_from_gene_id(self.gene_id)
+            self.transcript_id, info = vals
         self.cds_seq = self.get_cds_seq(self.transcript_id)
         self.aa_seq = self.cds_seq.translate()
 
@@ -82,43 +97,55 @@ class CanonicalInfo:
                 u3_cutoff = min(u3_starts)
         return u5_cutoff, u3_cutoff
 
-    @staticmethod
-    def fetch_transcript(transcript_id, server='http://grch37.rest.ensembl.org'):
+    def fetch_transcript(self, transcript_id):
         """Lookup transcript, exon and UTR info from Ensembl Rest API."""
-        client = EnsemblRestClient(server)
-        transcript_info = client.perform_rest_action(
+
+        transcript_info = self.client.perform_rest_action(
             '/lookup/id/{0}'.format(transcript_id),
             params={'object_type': 'transcript',
                     'expand': 1, 'utr': 1})
         return transcript_info
 
-    @staticmethod
-    def fetch_gene_from_symbol(symbol, server='http://grch37.rest.ensembl.org'):
-        """Lookup transcript, exon and UTR info from Ensembl Rest API."""
-        client = EnsemblRestClient(server)
-
-        symbol_lookup = client.perform_rest_action(
+    def fetch_gene_id_from_symbol(self, symbol):
+        """Lookup ensembl gene symbol from Ensembl REST API."""
+        symbol_lookup = self.client.perform_rest_action(
             '/xrefs/symbol/human/{0}'.format(symbol),
             params={'external_db': 'HGNC', 'object_type':'gene'})
-        gene_id = symbol_lookup[0]['id']
+        if not symbol_lookup:
+            raise LookupFailedException('Failed to find match for {}'.\
+                                        format(symbol))
+        # THERE IS AT LEAST ONE SYMBOL MATCH
+        ids = [i['id'] for i in symbol_lookup]
+        if len(symbol_lookup) == 1:
+            gene_id = ids[0]
+        else:
+            data = {'ids': ids}
+            d = self.client.perform_rest_action('/lookup/id', data_dict=data)
+            good_ids = [i for i in d if d[i]['display_name'] == symbol]
+            if not good_ids:
+                raise LookupFailedException("No exact matches for {}"
+                                            .format(symbol))
+            else:  # use first matching id
+                gene_id = good_ids[0]
+        return gene_id
 
-        gene = client.perform_rest_action(
+    def fetch_transcript_info_from_gene_id(self, gene_id):
+        """ Look up transcript, exon and UTR info from Ensembl Rest API."""
+        gene = self.client.perform_rest_action(
             '/lookup/id/{0}'.format(gene_id),
             params={'expand': '1', 'utr': 1})
 
         transcripts = [i for i in gene['Transcript'] if i['is_canonical'] == 1]
         if len(transcripts) != 1:
-            raise LookupFailedException("Lookup for symbol {} failed".format(
-                symbol))
+            raise LookupFailedException("Lookup for gene {} failed".format(
+                gene_id))
         transcript_info = transcripts[0]
         transcript_id = transcript_info['id']
-        return gene_id, transcript_id, transcript_info
+        return transcript_id, transcript_info
 
-    @staticmethod
-    def get_cds_seq(transcript_id, server='http://grch37.rest.ensembl.org'):
+    def get_cds_seq(self, transcript_id):
         """Lookup transcript, exon and UTR info from Ensembl Rest API."""
-        client = EnsemblRestClient(server)
-        seq_info = client.perform_rest_action(
+        seq_info = self.client.perform_rest_action(
             '/sequence/id/{0}'.format(transcript_id),
             params={'type': 'cds'})
         seq_str = seq_info['seq']
@@ -131,7 +158,7 @@ class CanonicalInfo:
     def fetch_ids_for_hugo(hugo_symbol):
         """Get canonical transcript id and gene_id from ensembl."""
         con, rows, transcript_id, gene_id = None, None, None, None
-        cmd1 = "SELECT `canonical_transcript`, `ensembl_gene_id` FROM " \
+        cmd1 = "SELECT `canonical_transcript`, `ensembl_gene_id`,  hg19_valid FROM " \
                "refs.`ensembl_canonical` WHERE hugo_symbol = {!r};".\
             format(hugo_symbol)
         try:
@@ -149,7 +176,11 @@ class CanonicalInfo:
                 con.close()
         # rows is [[transcript,gene],[transcript,gene],...]
         for row in rows:
-            transcript_id = str(row[0])
+            hg19_valid = row[2]
+            if hg19_valid == 1:
+                transcript_id = str(row[0])
+            else:
+                transcript_id = None
             gene_id = str(row[1])
         return transcript_id, gene_id
 
@@ -290,7 +321,9 @@ class TranscriptSiteInfo:
 
     def add_site(self, pos, kind=None, is_silent=True):
         """Add site category info to collection that will include whole
-        transcript."""
+        transcript.
+        :rtype : None
+        """
         self.site_list.append((pos, kind, is_silent))
 
     def write_category_beds(self):
@@ -301,6 +334,7 @@ class TranscriptSiteInfo:
         ('transversion', True): 'path_c',
         ('transversion', False): 'path_d',
         }
+        :rtype : None
         """
         streams = dict()  # 4 output streams
         try:
@@ -418,9 +452,9 @@ def get_beds_for_hugo_list(hugo_list,
     """Takes list of refseq_NM strings and creates silent and nonsilent bed
     files."""
     path_list = [silent_ts, nonsilent_ts, silent_tv, nonsilent_tv]
-    for path in path_list:
-        if os.path.exists(path):
-            os.remove(path)
+    # for path in path_list:
+    #     if os.path.exists(path):
+    #         os.remove(path)
 
     for hugo in hugo_list:
         append_category_beds(hugo,
