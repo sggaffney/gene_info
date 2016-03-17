@@ -5,7 +5,14 @@ import MySQLdb as mdb
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 import numpy as np
+
 from lookup_hg19 import lookup_hg19  # also has test_cpg
+from . import NoIntervalsException, dbvars
+
+
+class LookupFailedException(Exception):
+    pass
+
 
 class GeneSeq():
     """Holds exon CDS info for obtaining transcript coordinates."""
