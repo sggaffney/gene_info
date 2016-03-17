@@ -1,10 +1,15 @@
 #!/usr/bin/env python
-""" Requires ~/ref/human_g1k_v37.fasta(.fai) and samtools for lookup using faidx
+"""
+Requires /scratch/fasta/human_g1k_v37.fasta(.fai). pyfaidx for fast lookup.
 """
 
-import subprocess
 import os
-import sys
+import subprocess
+
+from . import fasta_path
+import pyfaidx
+
+chroms = pyfaidx.Fasta(fasta_path, filt_function=lambda x: x[0] != 'G')
 
 
 def lookup_hg19(chrom, start_pos, end_pos=None):
@@ -15,31 +20,16 @@ def lookup_hg19(chrom, start_pos, end_pos=None):
     """
     if not end_pos:
         end_pos = start_pos
-    user_dir = os.path.expanduser('~')
-    fasta_path = os.path.join(user_dir, 'ref', 'human_g1k_v37.fasta')
-    samtools_path = os.path.join(user_dir,'bin', 'samtools_bin', 'samtools')
-    cmd = "{samtools} faidx {fastapath} {chrom}:{start_pos}-{end_pos}".format(
-            samtools=samtools_path, fastapath=fasta_path, chrom=chrom,
-            start_pos=start_pos, end_pos=end_pos)
-    str_out = subprocess.check_output(cmd.split(' '))
-    out_lines = str_out.split('\n')
-    bases = ''.join(out_lines[1:])
-    return bases
+    return str(chroms[chrom][start_pos-1:end_pos].seq)
 
 
 def test_cpg(chrom, pos):
     """
-    Return true if site is CpG. Tests adjacent sites looked up using hg19 fasta with samtools.
+    Return true if site is CpG. Tests adjacent sites looked up using hg19 fasta
+    with samtools.
     """
     is_cpg = False  # set default is_cpg, will test and override.
-    user_dir = os.path.expanduser('~')
-    fasta_path = os.path.join(user_dir, 'ref', 'human_g1k_v37.fasta')
-    samtools_path = os.path.join(user_dir, 'bin', 'samtools_bin', 'samtools')
-    cmd = "{samtools} faidx {fastapath} {chrom}:{posA}-{posB}".format(
-            samtools=samtools_path, fastapath=fasta_path, chrom=chrom,
-            posA=int(pos)-1, posB=int(pos)+1)
-    str_out = subprocess.check_output(cmd.split(' '))
-    bases3 = str_out.split('\n')[1]
+    bases3 = str(chroms[chrom][pos-2:pos+1].seq)
     left = bases3[0]
     mid = bases3[1]
     right = bases3[2]

@@ -65,6 +65,7 @@ class EnsemblRestClient(object):
                     self.perform_rest_action(endpoint, hdrs, params)
             else:
                 raise LookupFailedException(
-                    'Request failed for {0}: Status code: {1.status_code} Reason: {1.reason}\n'.format(endpoint, e.response))
+                    'Request failed for {0}: Status code: {1.status_code} '
+                    'Reason: {1.reason}\n'.format(endpoint, e.response))
 
         return out_data

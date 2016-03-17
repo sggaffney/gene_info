@@ -11,7 +11,7 @@ setup(name='gene_info',
       license='GPLv3',
       packages=['gene_info'],
       install_requires=[
-          'numpy', 'MySQLdb'
+          'numpy', 'sqlalchemy', 'pyfaidx'
       ],
       scripts=['bin/build_gene_beds', 'bin/lookup_hg19'],
       zip_safe=True,

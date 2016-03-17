@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import argparse
 import subprocess
 
 from gene_info import CanonicalInfo

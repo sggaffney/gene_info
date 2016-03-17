@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import numpy as np
-import MySQLdb as mdb
+from sqlalchemy import text
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 
 from ensembl_client import EnsemblRestClient, LookupFailedException
-from . import NoIntervalsException, dbvars
+from . import NoIntervalsException, engine
 
 
 class LengthMismatchException(Exception):
@@ -163,22 +163,14 @@ class CanonicalInfo(object):
     def fetch_ids_for_hugo(hugo_symbol):
         """Get canonical transcript id and gene_id from ensembl."""
         con, rows, transcript_id, gene_id = None, None, None, None
-        cmd1 = "SELECT `canonical_transcript`, `ensembl_gene_id`,  hg19_valid FROM " \
-               "refs.`ensembl_canonical` WHERE hugo_symbol = {!r};".\
+        cmd1 = "SELECT `canonical_transcript`, `ensembl_gene_id`,  hg19_valid "\
+               "FROM refs.`ensembl_canonical` WHERE hugo_symbol = :hugo;".\
             format(hugo_symbol)
-        try:
-            con = mdb.connect(**dbvars)
-            cur = con.cursor()
-            cur.execute(cmd1)
-            if cur.rowcount != 1:
-                raise LookupFailedException("Non-single row for transcript {}"
-                                            .format(hugo_symbol))
-            rows = cur.fetchall()
-        except mdb.Error as e:
-            print "Error %d: %s" % (e.args[0], e.args[1])
-        finally:
-            if con:
-                con.close()
+        cur = engine.execute(text(cmd1), hugo=hugo_symbol)
+        if cur.rowcount != 1:
+            raise LookupFailedException("Non-single row for transcript {}"
+                                        .format(hugo_symbol))
+        rows = cur.fetchall()
         # rows is [[transcript,gene],[transcript,gene],...]
         for row in rows:
             hg19_valid = row[2]
@@ -306,14 +298,3 @@ class CanonicalInfo(object):
 #     r = requests.get(url, params=params)
 #     stream = StringIO(r.text)
 #     return SeqIO.read(stream, "fasta")
-
-
-
-
-
-
-
-
-
-
-
