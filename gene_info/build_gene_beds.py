@@ -172,25 +172,3 @@ def get_beds_for_hugo_list(hugo_list,
                              nonsilent_tv=nonsilent_tv)
     for path in path_list:
         condense_bed(path)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    # parser.add_argument("refseq", help="Refseq_NM.")
-    parser.add_argument("hugo_file", help="File with list of hugo symbols.",
-                        type=file)
-    args = parser.parse_args()
-    # refseq = args.refseq
-    # append_category_beds(refseq)
-    hugo_file = args.refseq_file
-    hugos = list()
-    try:
-        for line in hugo_file:
-            hugos.append(line.strip().split('\t')[1])
-    finally:
-        hugo_file.close()
-
-    get_beds_for_hugo_list(hugos)
-
-    # g = GeneSeq(refseq)
-    # print g

@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+
+import argparse
+
+from gene_info.lookup_hg19 import lookup_hg19, test_cpg
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("chrom", help="Chromosome.", type=str)
+parser.add_argument("pos", help="Position.", type=int)
+args = parser.parse_args()
+
+bases_str = lookup_hg19(args.chrom, args.pos)
+print(bases_str)
+print('is_cpg = {}'.format(test_cpg(args.chrom, args.pos)))
