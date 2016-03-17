@@ -15,7 +15,7 @@ import sqlalchemy
 
 # CREATE SQLALCHEMY DB ENGINE
 home_dir = os.path.expanduser('~')
-cnf_path = os.path.join(home_dir,'.my.cnf')
+cnf_path = os.path.join(home_dir, '.my.cnf')
 db_url = sqlalchemy.engine.url.URL(drivername='mysql', host='localhost',
              database='refs',
              query={'read_default_file': cnf_path})
@@ -32,3 +32,5 @@ class LookupFailedException(Exception):
     pass
 
 from gene_info import CanonicalInfo
+from lookup_hg19 import lookup_hg19, test_cpg
+from categorize import get_mutation_category

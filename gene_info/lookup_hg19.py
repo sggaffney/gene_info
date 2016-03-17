@@ -9,7 +9,7 @@ import subprocess
 from . import fasta_path
 import pyfaidx
 
-chroms = pyfaidx.Fasta(fasta_path, filt_function=lambda x: x[0] != 'G')
+chroms = pyfaidx.Fasta(fasta_path)  # filt_function=lambda x: x[0] != 'G'
 
 
 def lookup_hg19(chrom, start_pos, end_pos=None):
@@ -20,6 +20,10 @@ def lookup_hg19(chrom, start_pos, end_pos=None):
     """
     if not end_pos:
         end_pos = start_pos
+    if type(chrom) != str:
+        raise TypeError('Chromosome (chrom) must be a string in 1-22,X,Y,MT')
+    if (type(start_pos), type(end_pos)) != (int, int):
+        raise TypeError('Position (pos) must be an int.')
     return str(chroms[chrom][start_pos-1:end_pos].seq)
 
 
@@ -28,6 +32,8 @@ def test_cpg(chrom, pos):
     Return true if site is CpG. Tests adjacent sites looked up using hg19 fasta
     with samtools.
     """
+    if type(chrom) != str:
+        raise TypeError('Chromosome (chrom) must be a string in 1-22,X,Y,MT')
     is_cpg = False  # set default is_cpg, will test and override.
     bases3 = str(chroms[chrom][pos-2:pos+1].seq)
     left = bases3[0]
