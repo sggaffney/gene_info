@@ -1,7 +1,7 @@
 __author__ = 'sgg'
 
 import unittest
-from gene_info_sgg import CanonicalInfo
+from gene_info import CanonicalInfo
 
 class CoordLookupTestCase(unittest.TestCase):
     """Tests for `gene_info_sgg.py`."""

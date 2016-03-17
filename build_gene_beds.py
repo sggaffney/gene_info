@@ -3,7 +3,7 @@ import os
 import argparse
 import subprocess
 
-from gene_info_sgg import CanonicalInfo
+from gene_info import CanonicalInfo
 from . import LookupFailedException
 
 
