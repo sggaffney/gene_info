@@ -27,6 +27,14 @@ def lookup_hg19(chrom, start_pos, end_pos=None):
     return str(chroms[chrom][start_pos-1:end_pos].seq)
 
 
+def get_seq_triplet(chrom, pos):
+    """Get 3-length string of bases around specified position.
+
+    Returns: pyfaidx.Sequence
+    """
+    return chroms[chrom][pos-2:pos+1]
+
+
 def test_cpg(chrom, pos):
     """
     Return true if site is CpG. Tests adjacent sites looked up using hg19 fasta
@@ -35,7 +43,7 @@ def test_cpg(chrom, pos):
     if type(chrom) != str:
         raise TypeError('Chromosome (chrom) must be a string in 1-22,X,Y,MT')
     is_cpg = False  # set default is_cpg, will test and override.
-    bases3 = str(chroms[chrom][pos-2:pos+1].seq)
+    bases3 = str(get_seq_triplet(chrom, pos))
     left = bases3[0]
     mid = bases3[1]
     right = bases3[2]

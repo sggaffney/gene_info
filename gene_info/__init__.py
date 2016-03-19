@@ -33,4 +33,4 @@ class LookupFailedException(Exception):
 
 from gene_info import CanonicalInfo
 from lookup_hg19 import lookup_hg19, test_cpg
-from categorize import get_mutation_category
+from categorize import get_mutation_category, get_mutation_category_lego
