@@ -24,7 +24,7 @@ def lookup_hg19(chrom, start_pos, end_pos=None):
         raise TypeError('Chromosome (chrom) must be a string in 1-22,X,Y,MT')
     if (type(start_pos), type(end_pos)) != (int, int):
         raise TypeError('Position (pos) must be an int.')
-    return str(chroms[chrom][start_pos-1:end_pos].seq)
+    return chroms[chrom][start_pos-1:end_pos]
 
 
 def get_seq_triplet(chrom, pos):

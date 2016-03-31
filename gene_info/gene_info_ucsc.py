@@ -74,7 +74,7 @@ class GeneSeq():
         seq_list = list()
         chrom = exonSet.chrom.lstrip('chr')
         for interval in exonSet.cds:
-            seq_list.append(lookup_hg19(chrom, *interval))
+            seq_list.append(str(lookup_hg19(chrom, *interval)))
         if exonSet.strand == '-':
             seq_list = seq_list[::-1]
             seq_list = [i[::-1] for i in seq_list]
