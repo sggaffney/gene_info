@@ -73,10 +73,11 @@ class CanonicalInfo(object):
 
         if lookup_seq:
             if self.cds_len != len(self.cds_seq):
-                raise LengthMismatchException("CDS intervals don't match seq "
+                raise LengthMismatchException(
+                    "CDS intervals don't match seq "
                     "length for {}".format(hugo_symbol))
 
-        self.n_codons = self.cds_len/3
+        self.n_codons = int(self.cds_len / 3)
 
     def __repr__(self):
         return "<{classname} for {hugo}. {n_aa}aa, {cdslen}bp>".format(
@@ -177,7 +178,7 @@ class CanonicalInfo(object):
         for either strand, exons always listed in 5-3 order.
         start position always less than end position.
         """
-        exon_intervals = zip(exon_starts, exon_ends)
+        exon_intervals = list(zip(exon_starts, exon_ends))
         # force increasing coordinate exon order
         if strand == -1:
             exon_intervals.reverse()
