@@ -2,7 +2,7 @@
 import os
 import subprocess
 
-from gene_info import CanonicalInfo
+from .gene_info import CanonicalInfo
 from . import LookupFailedException, bedtools_dir
 
 

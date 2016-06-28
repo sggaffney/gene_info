@@ -3,7 +3,7 @@ import numpy as np
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 
-from ensembl_client import EnsemblRestClient, LookupFailedException
+from .ensembl_client import EnsemblRestClient, LookupFailedException
 from . import NoIntervalsException, ensembl_df
 
 

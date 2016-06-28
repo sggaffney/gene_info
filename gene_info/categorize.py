@@ -1,4 +1,4 @@
-from lookup_hg19 import test_cpg, get_seq_triplet
+from .lookup_hg19 import test_cpg, get_seq_triplet
 
 __author__ = 'sgg'
 
