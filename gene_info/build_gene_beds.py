@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+"""Builds bed files with S/NS transition/transversion sites for gene list."""
+
 import os
 import subprocess
 
@@ -57,7 +58,7 @@ class TranscriptSiteInfo:
 
 def append_category_beds(hugo_symbol, silent_ts=None, silent_tv=None,
                          nonsilent_ts=None, nonsilent_tv=None):
-
+    """Append to bed files with sites for given gene."""
     try:
         t = CanonicalInfo(hugo_symbol, lookup_seq=True)
         cds_seq = t.cds_seq
@@ -75,7 +76,6 @@ def append_category_beds(hugo_symbol, silent_ts=None, silent_tv=None,
                                    nonsilent_ts=nonsilent_ts,
                                    silent_tv=silent_tv,
                                    nonsilent_tv=nonsilent_tv)
-
     for codon_ind in range(len(aa_seq)):
         # identify previous and next base (prv_base, nxt_base)
         bases3 = cds_seq[codon_ind * 3:codon_ind * 3 + 3]
@@ -153,8 +153,11 @@ def get_beds_for_hugo_list(hugo_iterable,
                            silent_tv="roi_s_tv",
                            nonsilent_ts="roi_ns_ts",
                            nonsilent_tv="roi_ns_tv"):
-    """Takes list of refseq_NM strings and creates silent and nonsilent bed
-    files."""
+    """
+    Takes an iterable of hugo symbols and creates bed files.
+
+    Four bed files based on: silent/nonsilent, transition/transversion.
+    """
     path_list = [silent_ts, nonsilent_ts, silent_tv, nonsilent_tv]
     # for path in path_list:
     #     if os.path.exists(path):

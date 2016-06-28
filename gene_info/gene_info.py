@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+"""Uses Ensembl API to look up canonical transcript info for given gene."""
+
 import numpy as np
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC

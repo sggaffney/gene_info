@@ -1,13 +1,9 @@
-#!/usr/bin/env python
-"""
-Requires /scratch/fasta/human_g1k_v37.fasta(.fai). pyfaidx for fast lookup.
-"""
+"""hg19 sequence lookup functions."""
 
-import os
-import subprocess
+import pyfaidx
 
 from . import fasta_path
-import pyfaidx
+
 
 chroms = pyfaidx.Fasta(fasta_path)  # filt_function=lambda x: x[0] != 'G'
 
@@ -36,10 +32,7 @@ def get_seq_triplet(chrom, pos):
 
 
 def test_cpg(chrom, pos):
-    """
-    Return true if site is CpG. Tests adjacent sites looked up using hg19 fasta
-    with samtools.
-    """
+    """Return true if site is CpG."""
     if type(chrom) != str:
         raise TypeError('Chromosome (chrom) must be a string in 1-22,X,Y,MT')
     is_cpg = False  # set default is_cpg, will test and override.
