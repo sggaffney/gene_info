@@ -64,7 +64,7 @@ def append_category_beds(hugo_symbol, silent_ts=None, silent_tv=None,
         aa_seq = t.aa_seq
         # g = GeneSeq(refseq_NM)
     except LookupFailedException as e:
-        print e.message
+        print(e.message)
         return
     # print(g.cds_seq)
     alt_dict = dict(A='CGT', C='AGT', G='ACT', T='ACG')
@@ -76,12 +76,12 @@ def append_category_beds(hugo_symbol, silent_ts=None, silent_tv=None,
                                    silent_tv=silent_tv,
                                    nonsilent_tv=nonsilent_tv)
 
-    for codon_ind in xrange(len(aa_seq)):
+    for codon_ind in range(len(aa_seq)):
         # identify previous and next base (prv_base, nxt_base)
         bases3 = cds_seq[codon_ind * 3:codon_ind * 3 + 3]
         aa_orig = aa_seq[codon_ind]
         # for each of 3 bases
-        for subind in xrange(3):
+        for subind in range(3):
             # has_silent = False
             # has_nonsilent = False
             cds_ind = codon_ind * 3 + subind

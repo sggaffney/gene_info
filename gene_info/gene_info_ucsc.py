@@ -63,7 +63,7 @@ class GeneSeq():
                         self.refseq))
             rows = cur.fetchall()
         except mdb.Error as e:
-            print "Error %d: %s" % (e.args[0], e.args[1])
+            print("Error %d: %s" % (e.args[0], e.args[1]))
         finally:
             if con:
                 con.close()
@@ -149,21 +149,21 @@ class ExonSet():
         cds = list()
         utr_b = list()
         # CDS overlap tests. iterate over exons, assigning to utrs or cds.
-        for ind in xrange(len(exonStarts)):
+        for ind in range(len(exonStarts)):
             exStart = exonStarts[ind]
             exEnd = exonEnds[ind]
             # if interval before cds
             if exEnd < cdsStart:
                 utr_a.append((exStart, exEnd))
             # if interval overlaps cdsStart
-            elif exStart < cdsStart and exEnd >= cdsStart:
+            elif exStart < cdsStart <= exEnd:
                 utr_a.append((exStart, cdsStart - 1))
                 cds.append((cdsStart, exEnd))
             # if interval contained within cds
             elif exStart >= cdsStart and exEnd <= cdsEnd:
                 cds.append((exStart, exEnd))
             # if interval overlaps cdsEnd
-            elif exStart <= cdsEnd and exEnd > cdsEnd:
+            elif exStart <= cdsEnd < exEnd:
                 cds.append((exStart, cdsEnd))
                 utr_b.append((cdsEnd + 1, exEnd))
             # interval comes after cds
@@ -179,9 +179,9 @@ class ExonSet():
         # get interval index containing position
         use_interval = None
         found_interval = False
-        for ind in xrange(self.n_exons_cds):
+        for ind in range(self.n_exons_cds):
             interval = self.cds[ind]
-            if position >= interval[0] and position <= interval[1]:
+            if interval[0] <= position <= interval[1]:
                 found_interval = True
                 use_interval = ind
                 interval_pos = position - interval[0]
@@ -247,7 +247,7 @@ class ExonSet():
                     self.refseq))
             rows = cur.fetchall()
         except mdb.Error as e:
-            print "Error %d: %s" % (e.args[0], e.args[1])
+            print("Error %d: %s" % (e.args[0], e.args[1]))
         finally:
             if con:
                 con.close()
@@ -260,5 +260,5 @@ class ExonSet():
             exonEnds = str(row[4])
             chrom = str(row[5])
             hugo = str(row[6])
-        return (strand, cdsStart, cdsEnd, exonStarts, exonEnds, chrom, hugo)
+        return strand, cdsStart, cdsEnd, exonStarts, exonEnds, chrom, hugo
 

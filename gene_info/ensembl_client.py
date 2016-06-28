@@ -51,12 +51,12 @@ class EnsemblRestClient(object):
             r.raise_for_status()
             out_data = r.json()
 
-        except requests.exceptions.HTTPError, e:
+        except requests.exceptions.HTTPError as e:
             # check if we are being rate limited by the server
             if e.response.status_code == 429:
                 if 'Retry-After' in e.headers:
                     retry = e.headers['Retry-After']
-                    print "Retrying after {}".format(retry)
+                    print("Retrying after {}".format(retry))
                     time.sleep(float(retry))
                     self.perform_rest_action(endpoint, hdrs, params)
             else:

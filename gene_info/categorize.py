@@ -32,9 +32,15 @@ def get_mutation_category(chrom, pos, ref, alt):
         return 'indel'
     try:
         is_cpg = test_cpg(chrom, pos)
-    except KeyError, e:
-        print e.message
+    except KeyError as e:
+        print(e.message)
         return 'unknown'
+
+    base3 = get_seq_triplet(chrom, pos)
+    true_ref = str(base3)[1]
+    if ref != true_ref:
+        print('chr{chrom}:{pos} ref is {actual} not {ref}'.
+              format(chrom=chrom, pos=pos, actual=true_ref, ref=ref))
 
     if transition_dict[ref] == alt:
         change = 'transition'
@@ -67,7 +73,7 @@ def get_mutation_category_lego(chrom, pos, ref, alt):
     # get reverse complement if dealing with 6 'flipped' mutations
     true_ref = str(base3)[1]
     if ref != true_ref:
-        print('chr{chrom}:{pos} ref is {actual} not {ref}'.\
+        print('chr{chrom}:{pos} ref is {actual} not {ref}'.
               format(chrom=chrom, pos=pos, actual=true_ref, ref=ref))
     if change_str in change_map:
         change_str = change_map[change_str]
