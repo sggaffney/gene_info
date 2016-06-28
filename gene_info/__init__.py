@@ -40,6 +40,8 @@ class NoIntervalsException(Exception):
 class LookupFailedException(Exception):
     pass
 
+
 from gene_info import CanonicalInfo
 from lookup_hg19 import lookup_hg19, test_cpg
 from categorize import get_mutation_category, get_mutation_category_lego
+from build_gene_beds import get_beds_for_hugo_list

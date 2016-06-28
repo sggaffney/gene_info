@@ -59,7 +59,7 @@ def append_category_beds(hugo_symbol, silent_ts=None, silent_tv=None,
                          nonsilent_ts=None, nonsilent_tv=None):
 
     try:
-        t = CanonicalInfo(hugo_symbol)
+        t = CanonicalInfo(hugo_symbol, lookup_seq=True)
         cds_seq = t.cds_seq
         aa_seq = t.aa_seq
         # g = GeneSeq(refseq_NM)
@@ -149,10 +149,10 @@ def condense_bed(raw_path):
 
 
 def get_beds_for_hugo_list(hugo_list,
-                           silent_ts="/Users/Stephen/Downloads/roi_s_ts",
-                           silent_tv="/Users/Stephen/Downloads/roi_s_tv",
-                           nonsilent_ts="/Users/Stephen/Downloads/roi_ns_ts",
-                           nonsilent_tv="/Users/Stephen/Downloads/roi_ns_tv"):
+                           silent_ts="roi_s_ts",
+                           silent_tv="roi_s_tv",
+                           nonsilent_ts="roi_ns_ts",
+                           nonsilent_tv="roi_ns_tv"):
     """Takes list of refseq_NM strings and creates silent and nonsilent bed
     files."""
     path_list = [silent_ts, nonsilent_ts, silent_tv, nonsilent_tv]
