@@ -148,7 +148,7 @@ def condense_bed(raw_path):
     os.remove(sorted_path)
 
 
-def get_beds_for_hugo_list(hugo_list,
+def get_beds_for_hugo_list(hugo_iterable,
                            silent_ts="roi_s_ts",
                            silent_tv="roi_s_tv",
                            nonsilent_ts="roi_ns_ts",
@@ -160,7 +160,7 @@ def get_beds_for_hugo_list(hugo_list,
     #     if os.path.exists(path):
     #         os.remove(path)
 
-    for hugo in hugo_list:
+    for hugo in hugo_iterable:
         append_category_beds(hugo,
                              silent_ts=silent_ts,
                              nonsilent_ts=nonsilent_ts,
