@@ -4,9 +4,9 @@
 - Looks up canonical transcript properties for gene, using Ensembl API.
     * includes nucleotide and AA sequences, and CDS coordinate intervals.
 - Coordinate conversion from hg19 position to CDS indices, and vice versa.
+- Get nucleotide sequences for arbitrary hg19 intervals.
 - Look up trinucleotide context (e.g. for Lego plot) and identify CpG sites
 for mutation categorization and mutational signature quantification.
-- Get nucleotide sequences for arbitrary hg19 intervals.
 - Build BED files for silent/nonsilent transition/transversion sites.
     * These can be useful for generating custom coverage files for MutsigCV.
 
@@ -56,6 +56,17 @@ gene.get_cds_index(7579912)
 ```
 `>>> 0`
 
+### Nucleotide sequence lookup
+
+Provide a chromosome, start position and end position (both 1-based) for
+nucleotide sequence lookup:
+```python
+gene_info.lookup_hg19('12', 25398285, 25398290)
+```
+```
+>>> >12:25398285-25398290
+    CAGCTC
+```
 
 ### Mutation context
 
