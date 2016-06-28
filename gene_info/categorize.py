@@ -1,6 +1,6 @@
-__author__ = 'sgg'
-
 from lookup_hg19 import test_cpg, get_seq_triplet
+
+__author__ = 'sgg'
 
 
 class BadRefException(Exception):
@@ -18,6 +18,7 @@ change_map = {'G>A': 'C>T',
 
 lego_order = ['TT', 'CT', 'AT', 'GT', 'TC', 'CC', 'AC', 'GC', 'TA', 'CA', 'AA',
               'GA', 'TG', 'CG', 'AG', 'GG']
+
 
 def get_mutation_category(chrom, pos, ref, alt):
     """Get mutation category: A:T, C:G, Cpg transition or transversion.
@@ -56,7 +57,6 @@ def get_mutation_category_lego(chrom, pos, ref, alt):
     Returns: (tuple) base_before, change_str, base_after.
         e.g. ('C', 'C>A', 'A') for KRAS G12C mutation
     """
-
     if len(ref) > 1 and len(ref) == len(alt):
         return None, 'multiple', None
     if len(ref) != 1 or len(alt) != 1 or '-' in [ref, alt]:

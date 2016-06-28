@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 import numpy as np
-from sqlalchemy import text
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 
 from ensembl_client import EnsemblRestClient, LookupFailedException
-from . import NoIntervalsException, engine
+from . import NoIntervalsException, ensembl_df
 
 
 class LengthMismatchException(Exception):
@@ -71,7 +70,7 @@ class CanonicalInfo(object):
         self.n_cds_intervals = len(cds_intervals)
         a, b = zip(*cds_intervals)
         self.cds_len = sum(np.array(b) - np.array(a) + 1)
-        
+
         if lookup_seq:
             if self.cds_len != len(self.cds_seq):
                 raise LengthMismatchException("CDS intervals don't match seq "
@@ -115,9 +114,9 @@ class CanonicalInfo(object):
         """Lookup ensembl gene symbol from Ensembl REST API."""
         symbol_lookup = self.client.perform_rest_action(
             '/xrefs/symbol/human/{0}'.format(symbol),
-            params={'external_db': 'HGNC', 'object_type':'gene'})
+            params={'external_db': 'HGNC', 'object_type': 'gene'})
         if not symbol_lookup:
-            raise LookupFailedException('Failed to find match for {}'.\
+            raise LookupFailedException('Failed to find match for {}'.
                                         format(symbol))
         # THERE IS AT LEAST ONE SYMBOL MATCH
         ids = [i['id'] for i in symbol_lookup]
@@ -162,23 +161,12 @@ class CanonicalInfo(object):
     @staticmethod
     def fetch_ids_for_hugo(hugo_symbol):
         """Get canonical transcript id and gene_id from ensembl."""
-        con, rows, transcript_id, gene_id = None, None, None, None
-        cmd1 = "SELECT `canonical_transcript`, `ensembl_gene_id`,  hg19_valid "\
-               "FROM refs.`ensembl_canonical` WHERE hugo_symbol = :hugo;".\
-            format(hugo_symbol)
-        cur = engine.execute(text(cmd1), hugo=hugo_symbol)
-        if cur.rowcount != 1:
-            raise LookupFailedException("Non-single row for transcript {}"
-                                        .format(hugo_symbol))
-        rows = cur.fetchall()
-        # rows is [[transcript,gene],[transcript,gene],...]
-        for row in rows:
-            hg19_valid = row[2]
-            if hg19_valid == 1:
-                transcript_id = str(row[0])
-            else:
-                transcript_id = None
-            gene_id = str(row[1])
+        transcript_id, gene_id = None, None
+        ids_df = ensembl_df.loc[hugo_symbol]
+        try:
+            gene_id, transcript_id = ids_df
+        except:
+            pass
         return transcript_id, gene_id
 
     @staticmethod

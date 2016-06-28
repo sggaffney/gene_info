@@ -3,10 +3,7 @@ import os
 import subprocess
 
 from gene_info import CanonicalInfo
-from . import LookupFailedException
-
-
-bed_bin_dir = os.path.join(os.path.expanduser('~'), 'bin', 'bed')  # bedtools
+from . import LookupFailedException, bedtools_dir
 
 
 class TranscriptSiteInfo:
@@ -138,7 +135,7 @@ def condense_bed(raw_path):
     condense_path = raw_path + "_final.bed"
 
     cmd1 = ["sort", "-k1,1", "-k2,2n", raw_path, "-o", sorted_path]
-    cmd2 = [os.path.join(bed_bin_dir, "mergeBed"), "-i", sorted_path,
+    cmd2 = [os.path.join(bedtools_dir, "mergeBed"), "-i", sorted_path,
             "-c", "4", "-o", "distinct"]
     subprocess.check_call(cmd1)
     # with open(condense_path, 'w') as file:

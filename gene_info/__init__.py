@@ -1,27 +1,36 @@
-__author__ = 'Stephen G. Gaffney'
+import os
+import sys
+import pandas as pd
+
+from configparser import ConfigParser
 
 """
 DOWNLOAD human_g1k_v37.fasta and human_g1k_v37.fasta.fai from:
 ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/.
 (SEE http://www.1000genomes.org/category/assembly for description.)
 
-MOVE TO /scratch/fasta, or change path below.
+SPECIFY path (hg19_fasta_path) in config.ini file.
 """
 
-import os
+__author__ = 'Stephen G. Gaffney'
 
-import sqlalchemy
+# get fasta path and bedtools dir from config.ini
+parser = ConfigParser()
+config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                           'config', 'config.ini')
+parser.read(config_path)
 
+fasta_path = parser.get('default', 'hg19_fasta_path')
+if not os.path.isfile(fasta_path):
+    sys.exit("Please update hg19_fasta_path in {}".format(config_path))
 
-# CREATE SQLALCHEMY DB ENGINE
-home_dir = os.path.expanduser('~')
-cnf_path = os.path.join(home_dir, '.my.cnf')
-db_url = sqlalchemy.engine.url.URL(drivername='mysql', host='localhost',
-             database='refs',
-             query={'read_default_file': cnf_path})
-engine = sqlalchemy.create_engine(name_or_url=db_url)
+bedtools_dir = parser.get('default', 'bedtools_dir')
+if not os.path.isdir(bedtools_dir):
+    sys.exit("Please update bedtools_dir in {}".format(config_path))
 
-fasta_path = '/scratch/fasta/human_g1k_v37.fasta'
+ensembl_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                            'data', 'ensembl_canonical.txt')
+ensembl_df = pd.read_csv(ensembl_path, sep='\t', index_col=0)
 
 
 class NoIntervalsException(Exception):

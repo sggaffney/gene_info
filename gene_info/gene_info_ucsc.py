@@ -7,7 +7,9 @@ from Bio.Alphabet import IUPAC
 import numpy as np
 
 from lookup_hg19 import lookup_hg19  # also has test_cpg
-from . import NoIntervalsException, dbvars
+from . import NoIntervalsException
+
+dbvars = dict()
 
 
 class LookupFailedException(Exception):
@@ -24,8 +26,8 @@ class GeneSeq():
         # self.seq = self._fetchMrnaSeq()
         self.cds_seq = self._fetch_cds_seq(self.exonSet)
         self.hugo = self.exonSet.hugo
-        utr_5p_len = self.exonSet.utr_5p_len
-        utr_3p_len = self.exonSet.utr_3p_len
+        # utr_5p_len = self.exonSet.utr_5p_len
+        # utr_3p_len = self.exonSet.utr_3p_len
         cds_len = self.exonSet.cds_len
         # if len(self.seq) != (utr_5p_len + utr_3p_len + cds_len):
         #     raise Exception(
@@ -70,7 +72,8 @@ class GeneSeq():
             seq = str(row[0])
         return seq
 
-    def _fetch_cds_seq(self, exonSet):
+    @staticmethod
+    def _fetch_cds_seq(exonSet):
         seq_list = list()
         chrom = exonSet.chrom.lstrip('chr')
         for interval in exonSet.cds:
@@ -168,7 +171,7 @@ class ExonSet():
                 utr_b.append((exStart, exEnd))
             else:
                 raise Exception("Mysteriously failed cds overlap tests")
-        return (utr_a, cds, utr_b)
+        return utr_a, cds, utr_b
 
     def _get_CDS_coord_plus(self, position):
         """Get coordinate, indexing from 0, in CDS, positive strand."""

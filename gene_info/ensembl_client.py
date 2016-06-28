@@ -1,10 +1,6 @@
 # https://github.com/Ensembl/ensembl-rest/wiki/Example-Python-Client
 
-import sys
-# import urllib
-# import urllib2
 import requests
-import json
 import time
 
 # class RequestFailedException(Exception):
