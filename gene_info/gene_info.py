@@ -8,6 +8,9 @@ from .ensembl_client import EnsemblRestClient, LookupFailedException
 from . import NoIntervalsException, ensembl_df
 
 
+client = EnsemblRestClient(server='http://grch37.rest.ensembl.org')
+
+
 class LengthMismatchException(Exception):
     pass
 
@@ -19,39 +22,40 @@ class CanonicalInfo(object):
     on lookups. Specify lookup_seq=True for cds and aa sequence lookups.
     """
     def __init__(self, hugo_symbol=None, transcript_id=None, ensembl_gene=None,
-                 lookup_seq=False, server='http://grch37.rest.ensembl.org'):
-        self.client = EnsemblRestClient(server=server)
+                 lookup_seq=False):
+        """"""
         self.hugo_symbol = hugo_symbol
         self.transcript_id = transcript_id
         self.gene_id = ensembl_gene
+        self._cds_seq = None
+        self._aa_seq = None
         info = None
 
         try:
             # fetch_ids_for_hugo OR fetch_transcript could fail
             if transcript_id is None:
-                transcript_gene = self.fetch_ids_for_hugo(hugo_symbol)
+                transcript_gene = fetch_ids_for_hugo(hugo_symbol)
                 self.transcript_id, self.gene_id = transcript_gene
             if self.transcript_id is not None:
                 # REST LOOKUP from transcript id
-                info = self.fetch_transcript(self.transcript_id)
+                info = fetch_transcript(self.transcript_id)
             if self.transcript_id is None:
                 if self.gene_id is not None:
                     # REST LOOKUP from gene id
-                    vals = self.fetch_transcript_info_from_gene_id(self.gene_id)
+                    vals = fetch_transcript_info_from_gene_id(self.gene_id)
                     self.transcript_id, info = vals
                 else:
                     raise LookupFailedException("No match for {}".
                                                 format(self.gene_id))
         except LookupFailedException:
             # REST LOOKUP from symbol
-            self.gene_id = self.fetch_gene_id_from_symbol(hugo_symbol)
+            self.gene_id = fetch_gene_id_from_symbol(hugo_symbol)
             # REST LOOKUP from gene id
-            vals = self.fetch_transcript_info_from_gene_id(self.gene_id)
+            vals = fetch_transcript_info_from_gene_id(self.gene_id)
             self.transcript_id, info = vals
-        
+
         if lookup_seq:
-            self.cds_seq = self.get_cds_seq(self.transcript_id)
-            self.aa_seq = self.cds_seq.translate()
+            self._cds_seq = self.cds_seq
 
         self.chrom = info['seq_region_name']
         self.strand = info['strand']
@@ -65,11 +69,10 @@ class CanonicalInfo(object):
 
         u5_cutoff, u3_cutoff = self._get_utr_cutoffs(u5, u3)
 
-        cds_intervals = self._get_cds_intervals(self.strand, exon_starts,
-                                                exon_ends, u5_cutoff, u3_cutoff)
-        self.cds_intervals = cds_intervals
-        self.n_cds_intervals = len(cds_intervals)
-        a, b = zip(*cds_intervals)
+        self.cds_intervals = self._get_cds_intervals(
+            self.strand, exon_starts, exon_ends, u5_cutoff, u3_cutoff)
+        self.n_cds_intervals = len(self.cds_intervals)
+        a, b = zip(*self.cds_intervals)
         self.cds_len = sum(np.array(b) - np.array(a) + 1)
 
         if lookup_seq:
@@ -103,73 +106,29 @@ class CanonicalInfo(object):
                 u3_cutoff = min(u3_starts)
         return u5_cutoff, u3_cutoff
 
-    def fetch_transcript(self, transcript_id):
+    @property
+    def cds_seq(self):
         """Lookup transcript, exon and UTR info from Ensembl Rest API."""
-
-        transcript_info = self.client.perform_rest_action(
-            '/lookup/id/{0}'.format(transcript_id),
-            params={'object_type': 'transcript',
-                    'expand': 1, 'utr': 1})
-        return transcript_info
-
-    def fetch_gene_id_from_symbol(self, symbol):
-        """Lookup ensembl gene symbol from Ensembl REST API."""
-        symbol_lookup = self.client.perform_rest_action(
-            '/xrefs/symbol/human/{0}'.format(symbol),
-            params={'external_db': 'HGNC', 'object_type': 'gene'})
-        if not symbol_lookup:
-            raise LookupFailedException('Failed to find match for {}'.
-                                        format(symbol))
-        # THERE IS AT LEAST ONE SYMBOL MATCH
-        ids = [i['id'] for i in symbol_lookup]
-        if len(symbol_lookup) == 1:
-            gene_id = ids[0]
+        if not self._cds_seq:
+            seq_info = client.perform_rest_action(
+                '/sequence/id/{0}'.format(self.transcript_id),
+                params={'type': 'cds'})
+            seq_str = seq_info['seq']
+            if seq_str.startswith('N') or seq_str.endswith('N'):
+                seq_str = seq_str.strip('N')
+            seq = Seq(seq_str, IUPAC.unambiguous_dna)
+            self._cds_seq = seq
+            self._aa_seq = seq.translate()
         else:
-            data = {'ids': ids}
-            d = self.client.perform_rest_action('/lookup/id', data_dict=data)
-            good_ids = [i for i in d if d[i]['display_name'] == symbol]
-            if not good_ids:
-                raise LookupFailedException("No exact matches for {}"
-                                            .format(symbol))
-            else:  # use first matching id
-                gene_id = good_ids[0]
-        return gene_id
-
-    def fetch_transcript_info_from_gene_id(self, gene_id):
-        """ Look up transcript, exon and UTR info from Ensembl Rest API."""
-        gene = self.client.perform_rest_action(
-            '/lookup/id/{0}'.format(gene_id),
-            params={'expand': '1', 'utr': 1})
-
-        transcripts = [i for i in gene['Transcript'] if i['is_canonical'] == 1]
-        if len(transcripts) != 1:
-            raise LookupFailedException("Lookup for gene {} failed".format(
-                gene_id))
-        transcript_info = transcripts[0]
-        transcript_id = transcript_info['id']
-        return transcript_id, transcript_info
-
-    def get_cds_seq(self, transcript_id):
-        """Lookup transcript, exon and UTR info from Ensembl Rest API."""
-        seq_info = self.client.perform_rest_action(
-            '/sequence/id/{0}'.format(transcript_id),
-            params={'type': 'cds'})
-        seq_str = seq_info['seq']
-        if seq_str.startswith('N') or seq_str.endswith('N'):
-            seq_str = seq_str.strip('N')
-        seq = Seq(seq_str, IUPAC.unambiguous_dna)
+            seq = self._cds_seq
         return seq
 
-    @staticmethod
-    def fetch_ids_for_hugo(hugo_symbol):
-        """Get canonical transcript id and gene_id from ensembl."""
-        transcript_id, gene_id = None, None
-        ids_df = ensembl_df.loc[hugo_symbol]
-        try:
-            gene_id, transcript_id = ids_df
-        except:
-            pass
-        return transcript_id, gene_id
+    @property
+    def aa_seq(self):
+        """Lookup transcript, exon and UTR info from Ensembl Rest API."""
+        if not self._aa_seq:
+            _ = self.cds_seq  # load cds_seq and aa_seq from ensembl api
+        return self._aa_seq
 
     @staticmethod
     def _get_cds_intervals(strand, exon_starts, exon_ends,
@@ -266,6 +225,66 @@ class CanonicalInfo(object):
         else:
             hg_pos = self.cds_intervals[interval_ind][1] - subinterval_ind
         return hg_pos
+
+
+def fetch_ids_for_hugo(hugo_symbol):
+    """Get canonical transcript id and gene_id from ensembl."""
+    transcript_id, gene_id = None, None
+    ids_df = ensembl_df.loc[hugo_symbol]
+    try:
+        gene_id, transcript_id = ids_df
+    except:
+        pass
+    return transcript_id, gene_id
+
+
+def fetch_gene_id_from_symbol(symbol):
+    """Lookup ensembl gene symbol from Ensembl REST API."""
+    symbol_lookup = client.perform_rest_action(
+        '/xrefs/symbol/human/{0}'.format(symbol),
+        params={'external_db': 'HGNC', 'object_type': 'gene'})
+    if not symbol_lookup:
+        raise LookupFailedException('Failed to find match for {}'.
+                                    format(symbol))
+    # THERE IS AT LEAST ONE SYMBOL MATCH
+    ids = [i['id'] for i in symbol_lookup]
+    if len(symbol_lookup) == 1:
+        gene_id = ids[0]
+    else:
+        data = {'ids': ids}
+        d = client.perform_rest_action('/lookup/id', data_dict=data)
+        good_ids = [i for i in d if d[i]['display_name'] == symbol]
+        if not good_ids:
+            raise LookupFailedException("No exact matches for {}"
+                                        .format(symbol))
+        else:  # use first matching id
+            gene_id = good_ids[0]
+    return gene_id
+
+
+def fetch_transcript(transcript_id):
+    """Lookup transcript, exon and UTR info from Ensembl Rest API."""
+
+    transcript_info = client.perform_rest_action(
+        '/lookup/id/{0}'.format(transcript_id),
+        params={'object_type': 'transcript',
+                'expand': 1, 'utr': 1})
+    return transcript_info
+
+
+def fetch_transcript_info_from_gene_id(gene_id):
+    """ Look up transcript, exon and UTR info from Ensembl Rest API."""
+    gene = client.perform_rest_action(
+        '/lookup/id/{0}'.format(gene_id),
+        params={'expand': '1', 'utr': 1})
+
+    transcripts = [i for i in gene['Transcript'] if i['is_canonical'] == 1]
+    if len(transcripts) != 1:
+        raise LookupFailedException("Lookup for gene {} failed".format(
+            gene_id))
+    transcript_info = transcripts[0]
+    transcript_id = transcript_info['id']
+    return transcript_id, transcript_info
 
 
 # import requests
