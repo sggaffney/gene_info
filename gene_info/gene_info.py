@@ -4,7 +4,7 @@ import numpy as np
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
 
-from .ensembl_client import EnsemblRestClient, LookupFailedException
+from gene_info.ensembl_client import EnsemblRestClient, LookupFailedException
 from . import NoIntervalsException, ensembl_df
 
 
