@@ -7,9 +7,14 @@ from gene_info.lookup_hg19 import lookup_hg19, test_cpg
 
 parser = argparse.ArgumentParser()
 parser.add_argument("chrom", help="Chromosome.", type=str)
-parser.add_argument("pos", help="Position.", type=int)
+parser.add_argument("pos", help="Position (start position if endpos provided)",
+                    type=int)
+parser.add_argument("endpos", help="Optional end position.", nargs='?',
+                    type=int, default=None)
 args = parser.parse_args()
 
-bases_str = lookup_hg19(args.chrom, args.pos)
+
+bases_str = lookup_hg19(args.chrom, args.pos, args.endpos)
 print(bases_str)
-print('is_cpg = {}'.format(test_cpg(args.chrom, args.pos)))
+if not args.endpos:
+    print('is_cpg = {}'.format(test_cpg(args.chrom, args.pos)))
